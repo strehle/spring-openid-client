@@ -1,0 +1,19 @@
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          uaa:
+            provider: uaa
+            client-id: login
+            client-authentication-method: none
+            authorization-grant-type: authorization_code
+            scope:
+              - openid
+        provider:
+          uaa:
+            issuer-uri: http://localhost:8080/uaa/oauth/token
+welcome:
+  message: Welcome to Spring UAA example
+
+appurl: http://localhost:7000
