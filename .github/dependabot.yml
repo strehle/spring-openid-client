@@ -13,3 +13,5 @@ updates:
     ignore:
       - dependency-name: "org.springframework.boot:*"
         update-types: ["version-update:semver-major"] # v3 requires java 17
+        versions:
+        - ">= 3"
