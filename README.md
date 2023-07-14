@@ -14,6 +14,7 @@ Start a UAA locally
 
 
 Start now the demo app
+
     $ git clone git@github.com:strehle/spring-openid-client.git
     $ cd spring-openid-client
     $ ./start.sh
