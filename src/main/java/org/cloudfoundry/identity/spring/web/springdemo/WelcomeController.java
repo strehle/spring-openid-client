@@ -20,7 +20,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import javax.servlet.http.HttpServletRequest;
@@ -92,8 +92,10 @@ public class WelcomeController {
       model.addAttribute("client_id",client_id);
       model.addAttribute("token_url", token_url);
       model.addAttribute("refresh", object.getAsString("refresh_token"));
-    } catch (RestClientException e) {
-      response. sendRedirect("/logout");
+    } catch (HttpClientErrorException e) {
+      e.printStackTrace();
+      model.addAttribute("message", e.getStatusCode().getReasonPhrase() + " " + e.getMessage());
+      return "error";
     }
     return "secured_welcome"; //view
   }
