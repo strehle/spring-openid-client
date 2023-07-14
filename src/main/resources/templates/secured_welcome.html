@@ -19,7 +19,12 @@
             <span th:text="${name}"></span>
             <br>
             <p></p>
-            <a href="/secured/">Retry</a>
+            <form th:action="@{/refresh}" method="post">
+                <input type="hidden" name="refresh" th:value="${refresh}">
+                <input type="hidden" name="client_id" th:value="${client_id}">
+                <input type="hidden" name="token_url" th:value="${token_url}">
+                <input type="submit" name="submit" class="left-element" value="Refresh">
+            </form>
             <p></p><p></p>
             <a href="/logout">Logout</a>
         </h2>
