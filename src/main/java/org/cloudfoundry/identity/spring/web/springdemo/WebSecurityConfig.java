@@ -59,9 +59,6 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 
   @Override
   public void configure(HttpSecurity http) throws Exception {
-    //DefaultAuthorizationCodeTokenResponseClient defaultAuthorizationCodeTokenResponseClient = new DefaultAuthorizationCodeTokenResponseClient();
-    //RestTemplate restTemplate = new RestTemplate();
-    //defaultAuthorizationCodeTokenResponseClient.setRestOperations(restTemplate);
     Security.addProvider(new BouncyCastleProvider());
 
     http.
@@ -72,7 +69,6 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         anyRequest().permitAll().
         and().
         logout(logout -> logout.logoutSuccessHandler(oidcLogoutSuccessHandler())).
-        //oauth2Client(oauth2 -> oauth2.authorizationCodeGrant(codeGrant -> codeGrant.accessTokenResponseClient(accessTokenResponseClient()))).
         oauth2Login().
         tokenEndpoint().
         accessTokenResponseClient(accessTokenResponseClient());
@@ -122,8 +118,8 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
       if (privateJwk != null) {
         return privateJwk;
       }
-      RSAPublicKey publicKey = null;
-      RSAPrivateKey privateKey = null;
+      RSAPublicKey publicKey;
+      RSAPrivateKey privateKey;
       Base64URL x5t;
       try {
         X509Certificate x509 = X509CertUtils.parse(publicCertPem);
