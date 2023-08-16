@@ -3,11 +3,20 @@ spring:
     oauth2:
       client:
         registration:
-          uaa:
+          uaa-none:
             provider: uaa
             client-id: login
             client-authentication-method: none
             authorization-grant-type: authorization_code
+            client-name: "Public (none) client usage (authentication)"
+            scope:
+              - openid
+          uaa-pkj:
+            provider: uaa
+            client-id: login
+            client-authentication-method: private_key_jwt
+            authorization-grant-type: authorization_code
+            client-name: "Private_key_jwt client authentication"
             scope:
               - openid
         provider:
@@ -16,4 +25,13 @@ spring:
 welcome:
   message: Welcome to Spring UAA example
 
-appurl: http://localhost:7000
+appconfig:
+  appurl: http://localhost:7000
+  private-key: |
+    -----BEGIN PRIVATE KEY-----
+    MIIE==
+    -----END PRIVATE KEY-----
+  certificate: |
+    -----BEGIN CERTIFICATE-----
+    MIIE==
+    -----END CERTIFICATE-----
