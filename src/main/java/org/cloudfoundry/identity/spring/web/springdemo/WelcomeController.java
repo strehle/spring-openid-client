@@ -1,10 +1,14 @@
 package org.cloudfoundry.identity.spring.web.springdemo;
 
+import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.jwk.JWKSet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.minidev.json.JSONObject;
 import net.minidev.json.parser.JSONParser;
 import net.minidev.json.parser.ParseException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -35,6 +39,10 @@ public class WelcomeController {
   @Value("${welcome.message}")
   private String message;
 
+  @Autowired(required = false)
+  @Qualifier("privateJwk")
+  private JWK privateJwk;
+
 
   @GetMapping("/")
   public void main(HttpServletResponse response) throws IOException {
@@ -46,7 +54,7 @@ public class WelcomeController {
     return "index"; //view
   }
 
-  @GetMapping("/secured")
+  @GetMapping("/secured/*")
   public String authenticated(@RegisteredOAuth2AuthorizedClient()
   OAuth2AuthorizedClient authorizedClient, OAuth2AuthenticationToken oauthAuth, Model model) {
     OidcUser user = (OidcUser) oauthAuth.getPrincipal();
@@ -98,5 +106,19 @@ public class WelcomeController {
       return "error";
     }
     return "secured_welcome"; //view
+  }
+
+  @GetMapping("/jwks_uri")
+  public void jwksUri(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    if (privateJwk == null) {
+      response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+      return;
+    }
+    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+    response.setStatus(HttpServletResponse.SC_OK);
+    response.setHeader("Cache-Control", "no-cache, no-store");
+    response.setHeader("Pragma", "no-cache");
+    JWKSet jwkSet = new JWKSet(privateJwk.toPublicJWK());
+    response.getWriter().write(jwkSet.toString(true));
   }
 }
