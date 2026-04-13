@@ -76,9 +76,15 @@ public class WelcomeController {
     return "error"; //view
   }
 
+  @GetMapping("/logout-success")
+  public String logoutSuccess(Model model) {
+    model.addAttribute("message", message);
+    return "logout"; //view
+  }
+
   @PostMapping("/refresh")
   public String refresh(@RequestParam String refresh, @RequestParam String client_id, @RequestParam String token_url,
-      HttpServletRequest request, HttpServletResponse response, Model model) throws IOException, ParseException {
+      HttpServletRequest request, HttpServletResponse response, Model model) throws ParseException {
 
     RestTemplate template = new RestTemplate();
 
