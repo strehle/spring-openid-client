@@ -76,7 +76,7 @@ public class WebSecurityConfig {
   private Base64URL sha1Thumbprint;
 
   @Bean
-  public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+  public SecurityFilterChain securityFilterChain(HttpSecurity http) {
     Security.addProvider(new BouncyCastleProvider());
 
     http
@@ -85,7 +85,12 @@ public class WebSecurityConfig {
             .requestMatchers("/secured", "/secured/**").authenticated()
             .anyRequest().permitAll()
         )
-        .logout(logout -> logout.logoutSuccessHandler(oidcLogoutSuccessHandler()))
+        .logout(logout -> logout
+            .logoutSuccessHandler(oidcLogoutSuccessHandler())
+            .invalidateHttpSession(true)
+            .clearAuthentication(true)
+            .deleteCookies("JSESSIONID")
+        )
         .oauth2Login(oauth2 -> oauth2
             .tokenEndpoint(token -> token
                 .accessTokenResponseClient(accessTokenResponseClient())
@@ -142,7 +147,7 @@ public class WebSecurityConfig {
           .algorithm(JWSAlgorithm.RS256)
           .build();
     } catch (CertificateEncodingException | JOSEException e) {
-      throw new RuntimeException(e);
+      throw new IllegalStateException(e);
     }
     return privateJwk;
   }
@@ -150,7 +155,8 @@ public class WebSecurityConfig {
   private LogoutSuccessHandler oidcLogoutSuccessHandler() {
     OidcClientInitiatedLogoutSuccessHandler oidcLogoutSuccessHandler =
         new OidcClientInitiatedLogoutSuccessHandler(this.clientRegistrationRepository);
-    oidcLogoutSuccessHandler.setPostLogoutRedirectUri(appUrl);
+    // After OIDC logout, the IdP redirects back here; we then show our local logout page
+    oidcLogoutSuccessHandler.setPostLogoutRedirectUri(appUrl + "/logout-success");
     return oidcLogoutSuccessHandler;
   }
 
@@ -200,7 +206,7 @@ public class WebSecurityConfig {
           subject,
           BigInteger.valueOf(System.currentTimeMillis()),
           Date.from(now),
-          Date.from(now.plus(3650, ChronoUnit.DAYS)),
+          Date.from(now.plus(30, ChronoUnit.DAYS)),
           subject,
           ecPublicKey
       );
@@ -228,7 +234,7 @@ public class WebSecurityConfig {
              | java.security.NoSuchProviderException
              | OperatorCreationException
              | java.security.cert.CertificateException e) {
-      throw new RuntimeException("Failed to generate ES256 JWK", e);
+      throw new IllegalStateException("Failed to generate ES256 JWK", e);
     }
   }
 
