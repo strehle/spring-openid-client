@@ -8,25 +8,20 @@ import com.nimbusds.jose.util.X509CertUtils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.converter.FormHttpMessageConverter;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.oauth2.client.endpoint.DefaultAuthorizationCodeTokenResponseClient;
 import org.springframework.security.oauth2.client.endpoint.NimbusJwtClientAuthenticationParametersConverter;
-import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequestEntityConverter;
-import org.springframework.security.oauth2.client.endpoint.OAuth2ClientCredentialsGrantRequest;
-import org.springframework.security.oauth2.client.http.OAuth2ErrorResponseErrorHandler;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
+import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
 import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
-import org.springframework.security.oauth2.core.http.converter.OAuth2AccessTokenResponseHttpMessageConverter;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
-import org.springframework.web.client.RestTemplate;
 
-import java.net.URI;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.Security;
@@ -34,14 +29,13 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
-import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 
 @Configuration
 @EnableWebSecurity
-public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+public class WebSecurityConfig {
 
   @Autowired
   private ClientRegistrationRepository clientRegistrationRepository;
@@ -56,23 +50,27 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
   private String publicCertPem;
 
   private JWK privateJwk;
+  /** SHA-1 thumbprint of the certificate, used as x5t header value for Azure AD */
+  private Base64URL sha1Thumbprint;
 
-  @Override
-  public void configure(HttpSecurity http) throws Exception {
+  @Bean
+  public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     Security.addProvider(new BouncyCastleProvider());
 
-    http.
-        csrf().disable().
-        antMatcher("/**").
-        authorizeRequests().
-        antMatchers("/secured/**").authenticated().
-        anyRequest().permitAll().
-        and().
-        logout(logout -> logout.logoutSuccessHandler(oidcLogoutSuccessHandler())).
-        oauth2Login().
-        tokenEndpoint().
-        accessTokenResponseClient(accessTokenResponseClient());
+    http
+        .csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/secured/**").authenticated()
+            .anyRequest().permitAll()
+        )
+        .logout(logout -> logout.logoutSuccessHandler(oidcLogoutSuccessHandler()))
+        .oauth2Login(oauth2 -> oauth2
+            .tokenEndpoint(token -> token
+                .accessTokenResponseClient(accessTokenResponseClient())
+            )
+        );
 
+    return http.build();
   }
 
   private LogoutSuccessHandler oidcLogoutSuccessHandler() {
@@ -80,36 +78,30 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         new OidcClientInitiatedLogoutSuccessHandler(
             this.clientRegistrationRepository);
 
-    oidcLogoutSuccessHandler.setPostLogoutRedirectUri(
-        URI.create(appUrl));
+    oidcLogoutSuccessHandler.setPostLogoutRedirectUri(appUrl);
 
     return oidcLogoutSuccessHandler;
   }
 
-  private DefaultAuthorizationCodeTokenResponseClient accessTokenResponseClient() {
-    RestTemplate restTemplate = new RestTemplate();
-    restTemplate.getMessageConverters().addAll(0,
-        Arrays.asList(new FormHttpMessageConverter(), new OAuth2AccessTokenResponseHttpMessageConverter()));
-    restTemplate.setErrorHandler(new OAuth2ErrorResponseErrorHandler());
-    OAuth2AuthorizationCodeGrantRequestEntityConverter requestEntityConverter = new OAuth2AuthorizationCodeGrantRequestEntityConverter();
-
-    NimbusJwtClientAuthenticationParametersConverter<OAuth2ClientCredentialsGrantRequest> converter =
+  private RestClientAuthorizationCodeTokenResponseClient accessTokenResponseClient() {
+    NimbusJwtClientAuthenticationParametersConverter<OAuth2AuthorizationCodeGrantRequest> converter =
         new NimbusJwtClientAuthenticationParametersConverter<>(jwkResolver);
     /**
      * This client_assertion change is needed only for Azure AD
      */
     converter.setJwtClientAssertionCustomizer((context) -> {
-      context.getHeaders().header("x5t", privateJwk.getX509CertThumbprint().toString());
+      // x5t is the SHA-1 thumbprint required by Azure AD; sha1Thumbprint is populated by jwkResolver
+      if (sha1Thumbprint != null) {
+        context.getHeaders().header("x5t", sha1Thumbprint.toString());
+      }
     });
-    requestEntityConverter.addParametersConverter((NimbusJwtClientAuthenticationParametersConverter) converter);
     /**
-     * Other OIDC providers simply rely on kid
-    requestEntityConverter.addParametersConverter(new NimbusJwtClientAuthenticationParametersConverter<>(jwkResolver);
-    */
+     * Other OIDC providers simply rely on kid and do not need the customizer above
+     */
 
-    DefaultAuthorizationCodeTokenResponseClient tokenResponseClient = new DefaultAuthorizationCodeTokenResponseClient();
-    tokenResponseClient.setRestOperations(restTemplate);
-    tokenResponseClient.setRequestEntityConverter(requestEntityConverter);
+    RestClientAuthorizationCodeTokenResponseClient tokenResponseClient =
+        new RestClientAuthorizationCodeTokenResponseClient();
+    tokenResponseClient.addParametersConverter(converter);
     return tokenResponseClient;
   }
 
@@ -120,16 +112,22 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
       }
       RSAPublicKey publicKey;
       RSAPrivateKey privateKey;
-      Base64URL x5t;
       try {
         X509Certificate x509 = X509CertUtils.parse(publicCertPem);
-        x5t = Optional.ofNullable(computeSHA1Thumbprint(x509)).orElse(new Base64URL(UUID.randomUUID().toString()));
+        sha1Thumbprint = Optional.ofNullable(computeSHA1Thumbprint(x509))
+            .orElse(new Base64URL(UUID.randomUUID().toString()));
+        Base64URL x5tS256 = Optional.ofNullable(computeSHA256Thumbprint(x509))
+            .orElse(new Base64URL(UUID.randomUUID().toString()));
         publicKey = JWK.parse(x509).toRSAKey().toRSAPublicKey();
         privateKey = JWK.parseFromPEMEncodedObjects(privateKeyPem).toRSAKey().toRSAPrivateKey();
+        privateJwk = new RSAKey.Builder(publicKey)
+            .privateKey(privateKey)
+            .keyID(x5tS256.toString())
+            .x509CertSHA256Thumbprint(x5tS256)
+            .build();
       } catch (JOSEException e) {
         throw new RuntimeException(e);
       }
-      privateJwk = new RSAKey.Builder(publicKey).privateKey(privateKey).keyID(x5t.toString()).x509CertThumbprint(x5t).build();
       return privateJwk;
     }
     return null;
@@ -141,7 +139,20 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         return null;
       }
       byte[] derEncodedCert = cert.getEncoded();
-      MessageDigest sha256 = MessageDigest.getInstance("SHA-1");
+      MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
+      return Base64URL.encode(sha1.digest(derEncodedCert));
+    } catch (NoSuchAlgorithmException | CertificateEncodingException e) {
+      return null;
+    }
+  }
+
+  public static Base64URL computeSHA256Thumbprint(final X509Certificate cert) {
+    try {
+      if (cert == null) {
+        return null;
+      }
+      byte[] derEncodedCert = cert.getEncoded();
+      MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
       return Base64URL.encode(sha256.digest(derEncodedCert));
     } catch (NoSuchAlgorithmException | CertificateEncodingException e) {
       return null;

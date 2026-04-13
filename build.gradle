@@ -8,7 +8,9 @@ group = 'org.cloudfoundry.identity.spring.web'
 version = '0.0.1-SNAPSHOT'
 
 java {
-    sourceCompatibility = '17'
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 repositories {
@@ -22,6 +24,10 @@ dependencies {
     implementation 'org.bouncycastle:bcpkix-jdk18on:1.83'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('compileJava') {
+    options.compilerArgs += ['-Xlint:deprecation']
 }
 
 tasks.named('test') {

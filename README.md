@@ -4,7 +4,7 @@ Spring Security OpenID client implementation (demo use case)
 ## Quick Start
 
 Requirements:
-* Java 17 (minimum)
+* Java 21 (minimum)
 
 Start a UAA locally
 
