@@ -1,5 +1,7 @@
 package org.cloudfoundry.identity.spring.web.springdemo;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import net.minidev.json.JSONObject;
 import net.minidev.json.parser.JSONParser;
 import net.minidev.json.parser.ParseException;
@@ -23,8 +25,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collections;
 
@@ -83,10 +83,10 @@ public class WelcomeController {
     body.add("grant_type", "refresh_token");
     HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
 
-    ResponseEntity webResponse;
+    ResponseEntity<String> webResponse;
     try {
       webResponse =template.exchange(token_url, HttpMethod.POST, entity, String.class);
-      JSONObject object = (JSONObject) new JSONParser().parse((String)webResponse.getBody());
+      JSONObject object = (JSONObject) new JSONParser(JSONParser.DEFAULT_PERMISSIVE_MODE).parse((String)webResponse.getBody());
       model.addAttribute("message", "Received refresh token");
       model.addAttribute("name", refresh);
       model.addAttribute("client_id",client_id);
@@ -94,7 +94,7 @@ public class WelcomeController {
       model.addAttribute("refresh", object.getAsString("refresh_token"));
     } catch (HttpClientErrorException e) {
       e.printStackTrace();
-      model.addAttribute("message", e.getStatusCode().getReasonPhrase() + " " + e.getMessage());
+      model.addAttribute("message", e.getStatusCode().toString() + " " + e.getMessage());
       return "error";
     }
     return "secured_welcome"; //view

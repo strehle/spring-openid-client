@@ -5,7 +5,7 @@ spring:
         registration:
           uaa-none:
             provider: uaa
-            client-id: login
+            client-id: client_with_allowpublic_and_jwks_uri_trust
             client-authentication-method: none
             authorization-grant-type: authorization_code
             client-name: "Public (none) client usage (authentication)"
@@ -13,7 +13,7 @@ spring:
               - openid
           uaa-pkj:
             provider: uaa
-            client-id: login
+            client-id: client_with_allowpublic_and_jwks_uri_trust
             client-authentication-method: private_key_jwt
             authorization-grant-type: authorization_code
             client-name: "Private_key_jwt client authentication"
