@@ -27,11 +27,5 @@ welcome:
 
 appconfig:
   appurl: http://localhost:7000
-  private-key: |
-    -----BEGIN PRIVATE KEY-----
-    MIIE==
-    -----END PRIVATE KEY-----
-  certificate: |
-    -----BEGIN CERTIFICATE-----
-    MIIE==
-    -----END CERTIFICATE-----
+  private-key:
+  certificate:
